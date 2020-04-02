@@ -241,6 +241,92 @@ class Darknet(nn.Module):
             outputs[i] = x
         return detections
 
+    def load_weight(self, weightfile):
+        fp = open(weightfile, "rb")
+        # The first 5 values are header information
+        # 1. Major version number
+        # 2. Minor Version Number
+        # 3. Subversion number
+        # 4,5. Images seen by the network (during training)
+        # load header
+        header = np.fromfile(fp, dtype=np.int32, count = 5)
+        self.header = torch.from_numpy(header)
+        self.seen = self.header[3]
+
+        # load weight
+        weights = np.fromfile(fp, dtype = np.float32)
+        ptr = 0
+        for i in range(len(self.module_list)):
+            module_type = self.blocks[i + 1]["type"]
+            if module_type == "convolutional":
+                print("convolutional, ", i)
+                model = self.module_list[i]
+                try:
+                    batch_normalize = int(self.blocks[i+1]["batch_normalize"])
+                except:
+                    batch_normalize = 0
+
+                conv = model[0]
+                if batch_normalize:  # wait!!!!!
+                    bn = model[1]
+                    # get the number  of the weights of the BN layer
+                    num_bn_biases = bn.bias.numel()
+                    #load weight
+                    bn_biases = torch.from_numpy(weights[ptr : ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_weights = torch.from_numpy(weights[ptr : ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_running_mean = torch.from_numpy(weights[ptr : ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_running_var =  torch.from_numpy(weights[ptr : ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    # cast the loaded weight to model
+                    bn_biases = bn_biases.view_as(bn.bias.data)
+                    bn_weights = bn_weights.view_as(bn.weight.data)
+                    bn_running_mean = bn_biases.view_as(bn.running_mean)
+                    bn_running_var = bn_weights.view_as(bn.running_var)
+
+                    # copy data to model
+                    bn.bias.data.copy_(bn_biases)
+                    bn.weight.data.copy_(bn_weights)
+                    bn.running_mean.copy_(bn_running_mean)
+                    bn.running_var.copy_(bn_running_var)
+
+                else: # no batch normal
+                    num_biases = conv.bias.numel()
+                    # load weights
+                    conv_biases = torch.from_numpy(weights[ptr:ptr + num_biases])
+                    ptr = ptr  + num_biases
+
+                    #reshape the weights
+                    conv_biases = conv_biases.view_as(conv.bias.data)
+
+                    # copy data
+                    conv.bias.data.copy_(conv_biases)
+
+                #load convolutional layer's weight
+                num_weights = conv.weight.numel()
+
+                conv_weights = torch.from_numpy(weights[ptr:ptr + num_weights])
+                ptr = ptr + num_weights
+
+                conv_weights = conv_weights.view_as(conv.weight.data)
+                conv.weight.data.copy_(conv_weights)
+
+# test load weights
+weight_path = "./weights/yolov3.weights"
+cfg_path = "./cfg/yolov3.cfg"
+model = Darknet(cfg_path)
+model.load_weight(weight_path)
+
+
+
+
+
 
 # test darknet model
 def get_test_input(filename):
@@ -253,13 +339,13 @@ def get_test_input(filename):
     img_ = Variable(img_)
     return img_
 
-
-cfg_filename = "./cfg/yolov3.cfg"
-model = Darknet(cfg_filename)
-img_filename = "./images/dog-cycle-car.png"
-inp = get_test_input(img_filename)
-pred = model(inp, torch.cuda.is_available())
-print(pred)
+# # test forward
+# cfg_filename = "./cfg/yolov3.cfg"
+# model = Darknet(cfg_filename)
+# img_filename = "./images/dog-cycle-car.png"
+# inp = get_test_input(img_filename)
+# pred = model(inp, torch.cuda.is_available())
+# print(pred)
 
 
 
