@@ -1,7 +1,6 @@
 from __future__ import division
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 import cv2
@@ -181,6 +180,7 @@ class Darknet(nn.Module):
         self.net_info, self.module_list = create_modules(self.blocks)
 
     def forward(self, x, CUDA):
+        print("forward begin....")
         modules = self.blocks[1:]
         outputs = {}  # cache the outputs for route layer
         # flag denote we encountered the first detection or not
@@ -188,7 +188,7 @@ class Darknet(nn.Module):
         for i, module in enumerate(modules):
 
             module_type = (module["type"])
-            print("i: ", i, "module name: ", module_type, "x shape,", x.shape)
+            #print("i: ", i, "module name: ", module_type, "x shape,", x.shape)
 
             # convolutional and upsample
             if module_type == "convolutional" or module_type == "upsample":
@@ -241,7 +241,7 @@ class Darknet(nn.Module):
             outputs[i] = x
         return detections
 
-    def load_weight(self, weightfile):
+    def load_weights(self, weightfile):
         fp = open(weightfile, "rb")
         # The first 5 values are header information
         # 1. Major version number
@@ -317,16 +317,11 @@ class Darknet(nn.Module):
                 conv_weights = conv_weights.view_as(conv.weight.data)
                 conv.weight.data.copy_(conv_weights)
 
-# test load weights
-weight_path = "./weights/yolov3.weights"
-cfg_path = "./cfg/yolov3.cfg"
-model = Darknet(cfg_path)
-model.load_weight(weight_path)
-
-
-
-
-
+# # test load weights
+# weight_path = "./weights/yolov3.weights"
+# cfg_path = "./cfg/yolov3.cfg"
+# model = Darknet(cfg_path)
+# model.load_weight(weight_path)
 
 # test darknet model
 def get_test_input(filename):

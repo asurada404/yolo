@@ -1,1 +1,0 @@
-from liu.yolo.util import predict_transform
